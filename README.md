@@ -1,5 +1,7 @@
-# Samesurf Integration Module
-This module is intended to be a turn-key drop in component to enable Samesurf cobrowse. Note that you will need an account with Samesurf in order to receive your api key and secret.
+# Samesurf Cobrowse Module
+This module is intended integrate Samesurf cobrowse with a consumer facing website and allow users to initiate a cobrowse session.
+
+Note that you will need an account with Samesurf in order to receive your api key and secret.
 
 ## Quick Start
 
