@@ -1,30 +1,28 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>SameSurf Implementation</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#5e9aca" />
+  <meta charset="utf-8">
+  <title>Samesurf Implementation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#5e9aca" />
 </head>
 <body>
+  <!-- Add an ID of "coBrowseStart" to an element trigger coBrowse -->
+  <button id="coBrowseStart">Create Room</button>
+  <!-- Test messaging response from Samesurf -->
+  <button id="testMessaging">Message Test</button>
 
-  <button id="roomCreate">Create Room</button>
-  <button id="test">Message Test</button>
-
-  <script src="jquery-3.3.1.min.js"></script>
-  <!--
-  Load jsrsasign synchronously. Better to load async since lib is 300k. Supply 'jsrsAsignUrl' to options below
-  <script src="jsrsasign-all-min.js"></script>
-  -->
+  <!-- Configuration options for Samesurf implementation -->
   <script>
-    sameSurf = {
+    sameSurfOptions = {
       fullScreen: true,
       jsrsAsignUrl: 'jsrsasign-all-min.js',
-      startUrl: 'https://www.duckduckgo.com',
-      apiKey: '8DAKNDG8NO5OWY8FN7NI9UCACJKZI32T',
-      apiSecret: 'OL9VRLJJ2ZETQTKSMLQPPWZSJFBYJMOO'
+      startUrl: 'https://www.duckduckgo.com', // Optional
+      apiKey: 'YOUR_KEY',
+      apiSecret: 'YOUR_SECRET'
     }
   </script>
-  <script src="sameSurf.js"></script>
+  <!-- Include script directly above the close body tag and below sameSurfOptions -->
+  <script src="sameSurf.min.js" async defer></script>
 </body>
 </html>

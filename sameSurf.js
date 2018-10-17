@@ -1,30 +1,24 @@
-(function ($, kJUR, options) {
+(function (options) {
     'use strict';
 
-    // Make sure jquery is available
-    if (!$) {
-        console.error('jQuery not found, please make sure jQuery is available and that this script loads after it');
-        return false;
-    }
-
-
-    // Make sure RSA-Sign library is available
-    if (!kJUR && !options.jsrsAsignUrl) {
-        console.error('RSA-Sign not found, download and install "jsrsasign-all-min.js" from https://github.com/kjur/jsrsasign or supply a link in options with the location');
-        return false;
-    }
-    
     // Make sure api key and secret are available
     if (!options || !options.apiKey || !options.apiSecret) {
         var code = '<script> \n ' +
             '\t sameSurf = { \n ' +
             '\t\t fullScreen: true, \n ' +
+            '\t\t jsrsAsignUrl: "jsrsasign-all-min.js", \n ' +
             '\t\t startUrl: "YOURSTARTURL", \n ' +
             '\t\t apiKey: "YOURKEY", \n ' +
             '\t\t apiSecret: "YOURSECRET" \n ' +
             '\t }; \n ' +
             '</script> \n ';
-            console.error('Missing SameSurf api key or api secret. Please include the following code before this file. \n' + code);
+        console.error('Missing SameSurf api key or api secret. Please include the following code before this file. \n' + code);
+        return false;
+    }
+
+    // Make sure RSA-Sign library is available
+    if (!window.KJUR && !options.jsrsAsignUrl) {
+        console.error('RSA-Sign not found, download and install "jsrsasign-all-min.js" from https://github.com/kjur/jsrsasign and supply a link in options to jsrsAsignUrl');
         return false;
     }
 
@@ -36,19 +30,18 @@
         Variables
     *************************************************************/
 
-    var $window = $(window),
-        $document = $(document),
-        $head = $('head'),
+    var $head = document.getElementsByTagName('head')[0],
         // DOM elements
         iframe,
         loader,
         styles;
-        
+
 
     /************************************************************
         Methods
     *************************************************************/
 
+    /** Start cobrowse session */
     APP.coBrowseStart = function () {
 
         // If fullscreen, fire loading screen
@@ -57,16 +50,15 @@
             APP.createStyles();
         }
 
-        if (kJUR) {
+        // Check if security token generator is available, if not load it
+        if (window.KJUR) {
             APP.roomCreate();
-        } else if (options.jsrsAsignUrl) {
+        } else {
             // Load jsrsAsign async
             var script = document.createElement('script');
             script.src = options.jsrsAsignUrl;
             script.async = true;
             script.onload = function () {
-                // After successful load, update reference to KJUR and create a room
-                kJUR = window.KJUR;
                 APP.roomCreate();
             };
             script.onerror = function () {
@@ -76,18 +68,28 @@
         }
     };
 
+    /** End cobrowse session and clean up any legacy DOM elements */
+    APP.coBrowseEnd = function () {
+        // Remove loader and iframe
+        if (loader) {
+            loader.remove();
+        }
+        if (iframe) {
+            iframe.remove();
+        }
+    };
+
     /**
-     * Start screensahre and create a SameSurf room
+     * Create a SameSurf room
      */
     APP.roomCreate = function () {
-
         // Create tokens and token body
         var token_body = {
             iat: Math.floor(new Date().getTime() / 1000),
             sub: options.apiSecret
         };
-        var token = kJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, options.apiKey);
-        
+        var token = window.KJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, options.apiKey);
+
         // Create payload body
         var data = {};
 
@@ -96,31 +98,28 @@
             data.starturl = options.startUrl;
         }
 
-        $.ajax({
-            url: 'https://api.samesurf.com/api/v3/create',
-            dataType: 'json',
-            type: 'POST',
-            data: JSON.stringify(data),
-            beforeSend: function (xhr) {
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-            },
-            success: function (data) {
-                // If fullscreen, create fullscreen iframe. If not redirect to sameSurf url
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://api.samesurf.com/api/v3/create');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.onload = function () {
+            if (xhr.status === 200) { // Success
+                var data = JSON.parse(xhr.responseText);
+                // If fullscreen, create fullscreen iframe. If not redirect to samesurf url
                 if (options.fullScreen) {
                     APP.createIframe(data.privateinvitation);
                 } else {
                     window.location.replace(data.privateinvitation);
                 }
-            },
-            error: function (error) {
-                alert('Error loading screenshare: ' + error.statusText);
-                console.error(error);
-                // Remove loader and iframe on error
-                $(loader).remove();
-                $(iframe).remove();
+            } else { // Error
+                alert('Error attempting to start screenshare: ' + xhr.statusText);
+                console.error(xhr);
+                // Remove loaded and iframe on error
+                APP.coBrowseEnd();
             }
-        });
+        };
+        xhr.send(JSON.stringify(data));
     };
 
     /** Create the loading element that sits underneath the iframe */
@@ -159,7 +158,7 @@
     };
 
     /**
-     * Create an iframe in memory and attach properties
+     * Create an iframe with samesurfs private room url and place on top of current screen
      * @param {any} url - Url to load into iframe
      */
     APP.createIframe = function (url) {
@@ -176,43 +175,48 @@
         iframe.height = '100%';
         iframe.setAttribute('src', url);
         document.getElementsByTagName('body')[0].appendChild(iframe);
-        // $(iframe).on('message', function (e) { console.log('Postmessage to iframe received', e); });
     };
 
-    /** Listen to postmessage events */
-    APP.listen = function () {
-        $window.on('message', function (e) {
-            console.warn('Post Message', e);
-        });
+    /**
+     * After a postmessage has been received
+     * @param {any} e - Window message payload
+     */
+    APP.messageReceived = function (e) {
+        console.log('Message Received', e);
+        // Verify message is from approved url
+        if (e.origin === 'https://realtime.samesurf.com') {
+            var message = e.data;
+            // Perform action based on response type
+            switch (message.type) {
+                case 'storage_update':
+                    break;
+                case 'user_gone':
+                    break;
+                case 'user_logout':
+                    APP.coBrowseEnd();
+                    break;
+            }
+        } else {
+            console.warn('Message response from unapproved source');
+        }
     };
 
-    // Window load functions
-    $window.on('load', function () {
-        
-    });
-
-    // Window load and resize functions
-    $window.on('load resize', function () {
-
-    });
-
-    // Document ready functions
-    $document.ready(function () {
-        //APP.listen();
-
-        $('#roomCreate').on('click', function () {
-            APP.coBrowseStart();
-        });
-
-        $('#test').on('click', function () {
+    /** After the page has been loaded and the DOM is available */
+    APP.pageLoaded = function () {
+        // Click on coBrowseStart button/link
+        document.getElementById('coBrowseStart').addEventListener('click', APP.coBrowseStart, false);
+        document.getElementById('testMessaging').addEventListener('click', function () {
             window.parent.postMessage('Hello World', window.location.origin);
-        });
+        }, false);
+        // Listen for postmessage events
+        window.addEventListener('message', APP.messageReceived, false);
+    };
 
-        
+    // Check if document is loaded
+    if (document.readyState === 'loading') {
+        window.document.addEventListener('DOMContentLoaded', APP.pageLoaded, false);
+    } else {
+        APP.pageLoaded(); // If already loaded
+    }
 
-        $(window).on('message', function (e) { console.log('Postmessage received', e); });
-
-    });
-
-})(window.jQuery || null, window.KJUR || null, window.sameSurf || null);
-
+})(window.sameSurfOptions || null);
