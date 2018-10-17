@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#5e9aca" />
 </head>
 <body>
-  <!-- Add an ID of "coBrowseStart" to an element trigger coBrowse -->
+  <!-- Add an ID of "coBrowseStart" to an element to trigger coBrowse -->
   <button id="coBrowseStart">Create Room</button>
   <!-- Test messaging response from Samesurf -->
   <button id="testMessaging">Message Test</button>
@@ -15,14 +15,14 @@
   <!-- Configuration options for Samesurf implementation -->
   <script>
     sameSurfOptions = {
-      fullScreen: true,
-      jsrsAsignUrl: 'jsrsasign-all-min.js',
+      fullScreen: true, // Have iframe sit on top of current view, otherwise will redirect user
+      jsrsAsignUrl: 'vendor/jsrsasign-all-min.js', // URL location of jsrsasign-all-min.js
       startUrl: 'https://www.duckduckgo.com', // Optional
-      apiKey: 'YOUR_KEY',
-      apiSecret: 'YOUR_SECRET'
+      apiKey: '8DAKNDG8NO5OWY8FN7NI9UCACJKZI32T',
+      apiSecret: 'OL9VRLJJ2ZETQTKSMLQPPWZSJFBYJMOO'
     }
   </script>
   <!-- Include script directly above the close body tag and below sameSurfOptions -->
-  <script src="sameSurf.min.js" async defer></script>
+  <script src="dist/samesurf.js" async defer></script>
 </body>
 </html>
