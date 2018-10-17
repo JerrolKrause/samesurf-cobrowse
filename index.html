@@ -5,24 +5,26 @@
     <title>SameSurf Implementation</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#5e9aca" />
-   
-
 </head>
 <body>
 
-    <button id="roomCreate">Create Room</button>
-    <button id="test">Message Test</button>
+  <button id="roomCreate">Create Room</button>
+  <button id="test">Message Test</button>
 
-    <script src="jquery-3.3.1.min.js"></script>
-    <script src="jsrsasign-all-min.js"></script>
-    <script>
-        sameSurf = {
-            fullScreen: true,
-            startUrl: 'https://www.duckduckgo.com',
-            apiKey: '8DAKNDG8NO5OWY8FN7NI9UCACJKZI32T',
-            apiSecret: 'OL9VRLJJ2ZETQTKSMLQPPWZSJFBYJMOO'
-        }
-    </script>
-    <script src="sameSurf.js"></script>
+  <script src="jquery-3.3.1.min.js"></script>
+  <!--
+  Load jsrsasign synchronously. Better to load async since lib is 300k. Supply 'jsrsAsignUrl' to options below
+  <script src="jsrsasign-all-min.js"></script>
+  -->
+  <script>
+    sameSurf = {
+      fullScreen: true,
+      jsrsAsignUrl: 'jsrsasign-all-min.js',
+      startUrl: 'https://www.duckduckgo.com',
+      apiKey: '8DAKNDG8NO5OWY8FN7NI9UCACJKZI32T',
+      apiSecret: 'OL9VRLJJ2ZETQTKSMLQPPWZSJFBYJMOO'
+    }
+  </script>
+  <script src="sameSurf.js"></script>
 </body>
 </html>

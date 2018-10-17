@@ -7,9 +7,10 @@
         return false;
     }
 
+
     // Make sure RSA-Sign library is available
-    if (!kJUR) {
-        console.error('RSA-Sign not found, download and install "jsrsasign-all-min.js" from https://github.com/kjur/jsrsasign');
+    if (!kJUR && !options.jsrsAsignUrl) {
+        console.error('RSA-Sign not found, download and install "jsrsasign-all-min.js" from https://github.com/kjur/jsrsasign or supply a link in options with the location');
         return false;
     }
     
@@ -48,10 +49,7 @@
         Methods
     *************************************************************/
 
-    /**
-     * Start screensahre and create a SameSurf room
-     */
-    APP.roomCreate = function () {
+    APP.coBrowseStart = function () {
 
         // If fullscreen, fire loading screen
         if (options.fullScreen) {
@@ -59,13 +57,37 @@
             APP.createStyles();
         }
 
+        if (kJUR) {
+            APP.roomCreate();
+        } else if (options.jsrsAsignUrl) {
+            // Load jsrsAsign async
+            var script = document.createElement('script');
+            script.src = options.jsrsAsignUrl;
+            script.async = true;
+            script.onload = function () {
+                // After successful load, update reference to KJUR and create a room
+                kJUR = window.KJUR;
+                APP.roomCreate();
+            };
+            script.onerror = function () {
+                alert('Error loading screenshare. JsrsAsign not found.');
+            };
+            document.head.appendChild(script);
+        }
+    };
+
+    /**
+     * Start screensahre and create a SameSurf room
+     */
+    APP.roomCreate = function () {
+
         // Create tokens and token body
-        var token = kJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, options.apiKey);
         var token_body = {
             iat: Math.floor(new Date().getTime() / 1000),
             sub: options.apiSecret
         };
-
+        var token = kJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, options.apiKey);
+        
         // Create payload body
         var data = {};
 
@@ -142,7 +164,7 @@
      */
     APP.createIframe = function (url) {
         iframe = document.createElement('iframe');
-        iframe.id = 'ameriSurf';
+        iframe.id = 'sameSurfIframe';
         iframe.frameBorder = 0;
         iframe.style.position = 'fixed';
         iframe.style.top = '0px';
@@ -179,7 +201,7 @@
         //APP.listen();
 
         $('#roomCreate').on('click', function () {
-            APP.roomCreate();
+            APP.coBrowseStart();
         });
 
         $('#test').on('click', function () {
