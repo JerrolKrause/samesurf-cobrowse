@@ -22,22 +22,31 @@
   <hr />
 
   <p>Generate token from ApiKey</p>
-  <p><input id="apiKey" /> Api Key</p>
-  <p><input id="apiSecret" /> Api Secret</p>
+  <p><input id="apiKey" value="" /> Api Key</p>
+  <p><input id="apiSecret" value="" /> Api Secret</p>
   <p><button id="tokenCreate">Create Token</button></p>
   <div id="tokenDisplay"></div>
 
-  <!-- Configuration options for Samesurf implementation -->
+  <!-- Configuration options for Samesurf implementation
+      API Docs: https://dashboard.samesurf.com/api#create-a-room
+   -->
   <script>
     sameSurfOptions = {
-      fullScreen: true, // Have iframe sit on top of current view, otherwise will redirect user
-      jsrsAsignUrl: 'vendor/jsrsasign-all-min.js', // URL location of jsrsasign-all-min.js
-      // startUrl: 'https://www.duckduckgo.com', // Optional, will default to current url if not set
-      apiKey: 'YOUR_KEY',
-      apiSecret: 'YOUR_SECRET'
+      disabledfeatures: ['MODE_LOGOUT'], // Features to disable as per API docs
+      // starturl: 'https://www.duckduckgo.com', // Optional, will default to current url if not set
+      fullScreen: true, // Have iframe sit on top of current view, otherwise will redirect user offsite to Samesurf
+      tokenUrl: '/api/token.json', // Location to get Samesurf token from
     }
   </script>
   <!-- Include script directly above the close body tag and below sameSurfOptions -->
   <script src="dist/samesurf-cobrowse.js" async defer></script>
+
+
+  <!-- Do not include this script, only used for testing -->
+  <script>
+    document.getElementById('apiKey').value = '';
+    document.getElementById('apiSecret').value = '';
+  </script>
+  <script src="vendor/jsrsasign-all-min.js" async defer></script>
 </body>
 </html>

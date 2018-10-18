@@ -1,9 +1,11 @@
-interface Options {
+interface Data {
+  starturl?: string;
+  disabledfeatures?: string[];
+}
+
+interface Options extends Data {
   fullScreen?: boolean;
-  jsrsAsignUrl?: string;
-  startUrl?: string;
-  apiKey?: string;
-  apiSecret?: string;
+  tokenUrl?: string;
 }
 
 class SameSurfCobrowse {
@@ -11,10 +13,16 @@ class SameSurfCobrowse {
   public options: Options = (<any>window).sameSurfOptions;
   /** Reference to iframe which overlays the main DOM */
   private iframe: HTMLIFrameElement;
+  /** Reference to iframe which overlays the main DOM */
+  private iframeWrapper: HTMLDivElement;
   /** Reference to loading screen which sits under the iframe */
   private loader: HTMLDivElement;
   /** Reference to inline style block */
   private styles: HTMLStyleElement;
+  /** Samesurf token to pass to webapi */
+  private token: string;
+  /** Samesurf token to pass to webapi */
+  private roomNumber: string;
 
   constructor() {
     // Check if document is loaded
@@ -23,39 +31,29 @@ class SameSurfCobrowse {
       window.document.addEventListener('DOMContentLoaded', this.pageLoaded.bind(this), false);
     } else {
       // If already loaded
-      this.pageLoaded(); 
+      this.pageLoaded();
     }
   }
-  
+
   /** Start cobrowse session */
-  public coBrowseStart(existingRoomNumber?: string) {
+  public coBrowseStart() {
     // If fullscreen, fire loading screen
     if (this.options.fullScreen) {
       this.createLoader();
       this.createStyles();
     }
 
-    // Check if security token generator is available, if not load it
-    if ((<any>window).KJUR) {
-      this.roomCreateJoin(existingRoomNumber);
+    if (this.token) {
+      this.roomCreateJoin();
     } else {
-      // Load jsrsAsign async
-      var script = document.createElement('script');
-      script.src = this.options.jsrsAsignUrl;
-      script.async = true;
-      script.onload = () => {
-        this.roomCreateJoin(existingRoomNumber);
-      };
-      script.onerror = () => {
-        alert('Error loading screenshare. JsrsAsign not found.');
-        this.coBrowseEnd();
-      };
-      document.head.appendChild(script);
+      this.getToken();
     }
+
   };
 
   /** End cobrowse session and clean up any legacy DOM elements */
   public coBrowseEnd() {
+    this.token = null;
     // Remove loader and iframe if present
     if (this.loader) {
       this.loader.remove();
@@ -63,27 +61,59 @@ class SameSurfCobrowse {
     if (this.iframe) {
       this.iframe.remove();
     }
+    if (this.iframeWrapper) {
+      this.iframeWrapper.remove();
+    }
   };
+
+  /** Get a token from the web api */
+  public getToken() {
+    if ((<any>window).KJUR) {
+      this.generateToken();
+      this.roomCreateJoin();
+    } else {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', this.options.tokenUrl);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      //xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.onload = () => {
+        if (xhr.status === 200) { // Success
+          const data = JSON.parse(xhr.responseText);
+          if (data.token) {
+            this.token = data.token;
+            this.roomCreateJoin();
+          }
+        } else { // Error
+          alert('Error attempting to get token: ' + xhr.statusText);
+          console.error(xhr);
+          // Remove loaded and iframe on error
+          this.coBrowseEnd();
+        }
+      };
+      xhr.send();
+    }
+
+  }
 
   /**
    * Create a SameSurf room
    */
-  public roomCreateJoin(existingRoomNumber: string) {
-    // Create tokens and token body
-    var token_body = {
-      iat: Math.floor(new Date().getTime() / 1000),
-      sub: this.options.apiSecret
-    };
-    var token = (<any>window).KJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, this.options.apiKey);
+  public roomCreateJoin() {
 
     // Create payload body
-    var data = {
-      starturl: this.options.startUrl ? this.options.startUrl :window.location.origin
+    const data: Data = {
+      starturl: this.options.starturl ? this.options.starturl : window.location.origin
     };
 
+    // If disabled features have been added, attach to data
+    if (this.options.disabledfeatures) {
+      data.disabledfeatures = this.options.disabledfeatures;
+    }
+
     // If joining an existing room
-    if (existingRoomNumber) {
-      const url = 'https://realtime.stearnsstage.samesurf.com/' + existingRoomNumber + '/' + token;
+    if (this.roomNumber) {
+      const url = 'https://realtime.stearnsstage.samesurf.com/' + this.roomNumber + '/' + this.token;
       if (this.options.fullScreen) {
         this.createIframe(url);
       } else {
@@ -96,7 +126,7 @@ class SameSurfCobrowse {
       xhr.open('POST', 'https://api.samesurf.com/api/v3/create');
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + this.token);
       xhr.onload = () => {
         if (xhr.status === 200) { // Success
           var data = JSON.parse(xhr.responseText);
@@ -143,12 +173,15 @@ class SameSurfCobrowse {
     if (!this.styles) {
       const styles = document.createElement('style');
       styles.type = 'text/css';
-      var css = '.samesurf-loader{display:inline-block;position:relative;width:64px;height:64px}.samesurf-loader div{display:inline-block;position:absolute;left:6px;width:13px;background:#949494;animation:samesurf-loader 1.2s cubic-bezier(0,.5,.5,1) infinite}.samesurf-loader div:nth-child(1){left:6px;animation-delay:-.24s}.samesurf-loader div:nth-child(2){left:26px;animation-delay:-.12s}.samesurf-loader div:nth-child(3){left:45px;animation-delay:0}@keyframes samesurf-loader{0%{top:6px;height:51px}100%,50%{top:19px;height:26px}}';
+      const css = `.samesurf-loader{display:inline-block;position:relative;width:64px;height:64px}.samesurf-loader div{display:inline-block;position:absolute;left:6px;width:13px;background:#949494;animation:samesurf-loader 1.2s cubic-bezier(0,.5,.5,1) infinite}.samesurf-loader div:nth-child(1){left:6px;animation-delay:-.24s}.samesurf-loader div:nth-child(2){left:26px;animation-delay:-.12s}.samesurf-loader div:nth-child(3){left:45px;animation-delay:0}@keyframes samesurf-loader{0%{top:6px;height:51px}100%,50%{top:19px;height:26px}}`;
+      const iframe = `#samesurf-iframe{position:fixed;top:30px;right:0;bottom:0;left:0;z-index:9999;width: 100%;height: 100%;}`;
+      const iframeWrapper = `#samesurf-cobrowse-close{opacity:0.3;display:inline-block;width:25px;height:25px;position:relative}#samesurf-cobrowse-close:hover{opacity:1}#samesurf-cobrowse-close:after,#samesurf-cobrowse-close:before{position:absolute;left:15px;content:' ';height:25px;width:2px;background-color:#000}#samesurf-cobrowse-close:before{transform:rotate(45deg)}#samesurf-cobrowse-close:after{transform:rotate(-45deg)}#samesurf-iframe-wrapper{background-color:rgb(204, 204, 204);position:fixed;top:0;right:0;left:0;z-index:9999;text-align:right;width:100%;padding-top:0.25rem;padding-bottom:0.25rem}#samesurf-iframe-wrapper div{padding-left:0.5rem;padding-right:0.5rem;}#samesurf-iframe-wrapper span{float:left;line-height: 1.75rem;}`;
+      const cssAll = css + iframe + iframeWrapper;
       if ((<any>styles).styleSheet) {
         // This is required for IE8 and below.
-        (<any>styles).styleSheet.cssText = css;
+        (<any>styles).styleSheet.cssText = cssAll;
       } else {
-        styles.appendChild(document.createTextNode(css));
+        styles.appendChild(document.createTextNode(cssAll));
       }
       document.getElementsByTagName('head')[0].appendChild(styles);
       this.styles = styles;
@@ -161,19 +194,21 @@ class SameSurfCobrowse {
    */
   public createIframe(url: string) {
     const iframe = document.createElement('iframe');
-    iframe.id = 'sameSurfIframe';
+    iframe.id = 'samesurf-iframe';
     iframe.frameBorder = '0';
-    iframe.style.position = 'fixed';
-    iframe.style.top = '0px';
-    iframe.style.right = '0px';
-    iframe.style.bottom = '0px';
-    iframe.style.left = '0px';
-    iframe.style.zIndex = '9999';
-    iframe.width = '100%';
-    iframe.height = '100%';
     iframe.setAttribute('src', url);
     document.getElementsByTagName('body')[0].appendChild(iframe);
     this.iframe = iframe;
+
+    const iframeWrapper = document.createElement('div');
+    iframeWrapper.id = 'samesurf-iframe-wrapper';
+    iframeWrapper.innerHTML = '<div><span>Currently CoBrowsing</span><a href="#" id="samesurf-cobrowse-close" title="End cobrowsing"></a></div>';
+    document.getElementsByTagName('body')[0].appendChild(iframeWrapper);
+    // Click on token create
+    document.getElementById('samesurf-cobrowse-close').addEventListener('click', () => {
+      this.coBrowseEnd();
+    }, false);
+    this.iframeWrapper = iframeWrapper;
   };
 
   /**
@@ -201,26 +236,19 @@ class SameSurfCobrowse {
   };
 
   /** Generate the token needed by Samesurf from the apiKey and apiSecret */
-  public generateToken(apiKey: string, apiSecret:string) {
-    var script = document.createElement('script');
-    script.src = this.options.jsrsAsignUrl;
-    script.async = true;
-    script.onload = () => {
-      // Create tokens and token body
-      var token_body = {
-        iat: Math.floor(new Date().getTime() / 1000),
-        sub: apiSecret
-      };
-      // Create token
-      const token = (<any>window).KJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, apiKey);
+  public generateToken() {
+    // Get values from form elements
+    const apiKey = (<HTMLInputElement>document.getElementById('apiKey')).value;
+    const apiSecret = (<HTMLInputElement>document.getElementById('apiSecret')).value;
+    // Create tokens and token body
+    var token_body = {
+      iat: Math.floor(new Date().getTime() / 1000),
+      sub: apiSecret
+    };
+    // Create token
+    this.token = (<any>window).KJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, apiKey);
 
-      document.getElementById('tokenDisplay').innerHTML = `<div style="max-width:400px;padding:1rem;border:1px solid #ccc;word-break: break-all;">Your token is: <strong>${token}</strong></div>`;
-    };
-    script.onerror = () => {
-      alert('Error loading screenshare. JsrsAsign not found.');
-      this.coBrowseEnd();
-    };
-    document.head.appendChild(script);
+    document.getElementById('tokenDisplay').innerHTML = `<div style="max-width:400px;padding:1rem;border:1px solid #ccc;word-break: break-all;"><strong>${this.token}</strong></div>`;
   }
 
   /** After the page has been loaded and the DOM is available */
@@ -231,15 +259,15 @@ class SameSurfCobrowse {
     }, false);
     // Click on join cobrowse
     document.getElementById('coBrowseJoin').addEventListener('click', () => {
-      const roomNumber = (<HTMLInputElement>document.getElementById('coBrowseRoomNumber')).value;
-      this.coBrowseStart(roomNumber);
+      this.roomNumber = (<HTMLInputElement>document.getElementById('coBrowseRoomNumber')).value;
+      this.coBrowseStart();
     }, false);
+    
+
+
     // Click on token create
     document.getElementById('tokenCreate').addEventListener('click', () => {
-      // Get values from form elements
-      const apiKey = (<HTMLInputElement>document.getElementById('apiKey')).value;
-      const apiSecret = (<HTMLInputElement>document.getElementById('apiSecret')).value;
-      this.generateToken(apiKey, apiSecret);
+      this.generateToken();
     }, false);
 
     // Click on test messaging
