@@ -2,27 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Samesurf Implementation</title>
+  <title>Samesurf Cobrowse Implementation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#5e9aca" />
 </head>
 <body>
+
+  <p>Start a new cobrowse session</p>
   <!-- Add an ID of "coBrowseStart" to an element to trigger coBrowse -->
   <button id="coBrowseStart">Start Cobrowse</button>
+
   <!-- Test messaging response from Samesurf -->
   <button id="testMessaging">Message Test</button>
+  <hr />
+
+  <p>Join existing cobrowse session</p>
+  <input id="coBrowseRoomNumber" />
+  <button id="coBrowseJoin">Join Cobrowse</button>
+  <hr />
+
+  <p>Generate token from ApiKey</p>
+  <p><input id="apiKey" /> Api Key</p>
+  <p><input id="apiSecret" /> Api Secret</p>
+  <p><button id="tokenCreate">Create Token</button></p>
+  <div id="tokenDisplay"></div>
 
   <!-- Configuration options for Samesurf implementation -->
   <script>
     sameSurfOptions = {
       fullScreen: true, // Have iframe sit on top of current view, otherwise will redirect user
       jsrsAsignUrl: 'vendor/jsrsasign-all-min.js', // URL location of jsrsasign-all-min.js
-      startUrl: 'https://www.duckduckgo.com', // Optional
+      // startUrl: 'https://www.duckduckgo.com', // Optional, will default to current url if not set
       apiKey: 'YOUR_KEY',
       apiSecret: 'YOUR_SECRET'
     }
   </script>
   <!-- Include script directly above the close body tag and below sameSurfOptions -->
-  <script src="dist/samesurf.js" async defer></script>
+  <script src="dist/samesurf-cobrowse.js" async defer></script>
 </body>
 </html>

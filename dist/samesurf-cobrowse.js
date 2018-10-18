@@ -1,18 +1,20 @@
 "use strict";
-var SameSurf = /** @class */ (function () {
-    function SameSurf() {
+var SameSurfCobrowse = /** @class */ (function () {
+    function SameSurfCobrowse() {
         /** Holds Samesurf configuration options */
         this.options = window.sameSurfOptions;
         // Check if document is loaded
         if (document.readyState === 'loading') {
+            // If loading add event listener
             window.document.addEventListener('DOMContentLoaded', this.pageLoaded.bind(this), false);
         }
         else {
-            this.pageLoaded(); // If already loaded
+            // If already loaded
+            this.pageLoaded();
         }
     }
     /** Start cobrowse session */
-    SameSurf.prototype.coBrowseStart = function () {
+    SameSurfCobrowse.prototype.coBrowseStart = function (existingRoomNumber) {
         var _this = this;
         // If fullscreen, fire loading screen
         if (this.options.fullScreen) {
@@ -21,7 +23,7 @@ var SameSurf = /** @class */ (function () {
         }
         // Check if security token generator is available, if not load it
         if (window.KJUR) {
-            this.roomCreate();
+            this.roomCreateJoin(existingRoomNumber);
         }
         else {
             // Load jsrsAsign async
@@ -29,7 +31,7 @@ var SameSurf = /** @class */ (function () {
             script.src = this.options.jsrsAsignUrl;
             script.async = true;
             script.onload = function () {
-                _this.roomCreate();
+                _this.roomCreateJoin(existingRoomNumber);
             };
             script.onerror = function () {
                 alert('Error loading screenshare. JsrsAsign not found.');
@@ -40,7 +42,7 @@ var SameSurf = /** @class */ (function () {
     };
     ;
     /** End cobrowse session and clean up any legacy DOM elements */
-    SameSurf.prototype.coBrowseEnd = function () {
+    SameSurfCobrowse.prototype.coBrowseEnd = function () {
         // Remove loader and iframe if present
         if (this.loader) {
             this.loader.remove();
@@ -53,7 +55,7 @@ var SameSurf = /** @class */ (function () {
     /**
      * Create a SameSurf room
      */
-    SameSurf.prototype.roomCreate = function () {
+    SameSurfCobrowse.prototype.roomCreateJoin = function (existingRoomNumber) {
         var _this = this;
         // Create tokens and token body
         var token_body = {
@@ -62,40 +64,51 @@ var SameSurf = /** @class */ (function () {
         };
         var token = window.KJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, this.options.apiKey);
         // Create payload body
-        var data = {};
-        // If start url is supplied, add to data
-        if (this.options.startUrl) {
-            data.starturl = this.options.startUrl;
-        }
-        // Make http request
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://api.samesurf.com/api/v3/create');
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-        xhr.onload = function () {
-            if (xhr.status === 200) { // Success
-                var data = JSON.parse(xhr.responseText);
-                // If fullscreen, create fullscreen iframe. If not redirect to samesurf url
-                if (_this.options.fullScreen) {
-                    _this.createIframe(data.privateinvitation);
-                }
-                else {
-                    window.location.replace(data.privateinvitation);
-                }
-            }
-            else { // Error
-                alert('Error attempting to start screenshare: ' + xhr.statusText);
-                console.error(xhr);
-                // Remove loaded and iframe on error
-                _this.coBrowseEnd();
-            }
+        var data = {
+            starturl: this.options.startUrl ? this.options.startUrl : window.location.origin
         };
-        xhr.send(JSON.stringify(data));
+        // If joining an existing room
+        if (existingRoomNumber) {
+            var url = 'https://realtime.stearnsstage.samesurf.com/' + existingRoomNumber + '/' + token;
+            if (this.options.fullScreen) {
+                this.createIframe(url);
+            }
+            else {
+                window.location.replace(url);
+            }
+        }
+        else {
+            // Creating a new room
+            // Make http request
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'https://api.samesurf.com/api/v3/create');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            xhr.onload = function () {
+                if (xhr.status === 200) { // Success
+                    var data = JSON.parse(xhr.responseText);
+                    // If fullscreen, create fullscreen iframe. If not redirect to samesurf url
+                    if (_this.options.fullScreen) {
+                        _this.createIframe(data.privateinvitation);
+                    }
+                    else {
+                        window.location.replace(data.privateinvitation);
+                    }
+                }
+                else { // Error
+                    alert('Error attempting to start screenshare: ' + xhr.statusText);
+                    console.error(xhr);
+                    // Remove loaded and iframe on error
+                    _this.coBrowseEnd();
+                }
+            };
+            xhr.send(JSON.stringify(data));
+        }
     };
     ;
     /** Create the loading element that sits underneath the iframe */
-    SameSurf.prototype.createLoader = function () {
+    SameSurfCobrowse.prototype.createLoader = function () {
         var loader = document.createElement('div');
         loader.innerHTML = '<div class="samesurf-loader"><div></div><div></div><div></div></div> <div class="samesurf-loading">Loading screenshare, please stand by...</div>';
         loader.style.backgroundColor = '#fff';
@@ -114,7 +127,7 @@ var SameSurf = /** @class */ (function () {
     };
     ;
     /** Create and inject the css styling */
-    SameSurf.prototype.createStyles = function () {
+    SameSurfCobrowse.prototype.createStyles = function () {
         // Only inject styles once
         if (!this.styles) {
             var styles = document.createElement('style');
@@ -136,7 +149,7 @@ var SameSurf = /** @class */ (function () {
      * Create an iframe with samesurfs private room url and place on top of current screen
      * @param {any} url - Url to load into iframe
      */
-    SameSurf.prototype.createIframe = function (url) {
+    SameSurfCobrowse.prototype.createIframe = function (url) {
         var iframe = document.createElement('iframe');
         iframe.id = 'sameSurfIframe';
         iframe.frameBorder = '0';
@@ -157,7 +170,7 @@ var SameSurf = /** @class */ (function () {
      * After a postmessage has been received
      * @param {any} e - Window message payload
      */
-    SameSurf.prototype.messageReceived = function (e) {
+    SameSurfCobrowse.prototype.messageReceived = function (e) {
         console.log('Message Received', e);
         // Verify message is from approved url
         if (e.origin === 'https://realtime.samesurf.com') {
@@ -178,10 +191,48 @@ var SameSurf = /** @class */ (function () {
         }
     };
     ;
+    /** Generate the token needed by Samesurf from the apiKey and apiSecret */
+    SameSurfCobrowse.prototype.generateToken = function (apiKey, apiSecret) {
+        var _this = this;
+        var script = document.createElement('script');
+        script.src = this.options.jsrsAsignUrl;
+        script.async = true;
+        script.onload = function () {
+            // Create tokens and token body
+            var token_body = {
+                iat: Math.floor(new Date().getTime() / 1000),
+                sub: apiSecret
+            };
+            // Create token
+            var token = window.KJUR.jws.JWS.sign('HS256', { typ: 'JWT' }, token_body, apiKey);
+            document.getElementById('tokenDisplay').innerHTML = "<div style=\"max-width:400px;padding:1rem;border:1px solid #ccc;word-break: break-all;\">Your token is: <strong>" + token + "</strong></div>";
+        };
+        script.onerror = function () {
+            alert('Error loading screenshare. JsrsAsign not found.');
+            _this.coBrowseEnd();
+        };
+        document.head.appendChild(script);
+    };
     /** After the page has been loaded and the DOM is available */
-    SameSurf.prototype.pageLoaded = function () {
+    SameSurfCobrowse.prototype.pageLoaded = function () {
+        var _this = this;
         // Click on coBrowseStart button/link
-        document.getElementById('coBrowseStart').addEventListener('click', this.coBrowseStart.bind(this), false);
+        document.getElementById('coBrowseStart').addEventListener('click', function () {
+            _this.coBrowseStart();
+        }, false);
+        // Click on join cobrowse
+        document.getElementById('coBrowseJoin').addEventListener('click', function () {
+            var roomNumber = document.getElementById('coBrowseRoomNumber').value;
+            _this.coBrowseStart(roomNumber);
+        }, false);
+        // Click on token create
+        document.getElementById('tokenCreate').addEventListener('click', function () {
+            // Get values from form elements
+            var apiKey = document.getElementById('apiKey').value;
+            var apiSecret = document.getElementById('apiSecret').value;
+            _this.generateToken(apiKey, apiSecret);
+        }, false);
+        // Click on test messaging
         document.getElementById('testMessaging').addEventListener('click', function () {
             window.parent.postMessage('Hello World', window.location.origin);
         }, false);
@@ -189,7 +240,7 @@ var SameSurf = /** @class */ (function () {
         window.addEventListener('message', this.messageReceived.bind(this), false);
     };
     ;
-    return SameSurf;
+    return SameSurfCobrowse;
 }());
-new SameSurf();
-//# sourceMappingURL=samesurf.js.map
+new SameSurfCobrowse();
+//# sourceMappingURL=samesurf-cobrowse.js.map
